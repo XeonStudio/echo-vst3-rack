@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "appId": "5105090",
+  "publishedFileId": "3812043824",
+  "contentDirectory": "content",
+  "previewFile": "preview.png",
+  "visibility": "private",
+  "description": "目前已完成 10 槽位 VST3 机架、增效管理及本地音频 DSP 实时渲染。因官方底层未开放音频热路径拦截接口，网络流媒体暂无法挂载，现处于等待官方适配状态。请留意后续更新。",
+  "changeNote": "v1.0.0 初版工坊发布：包含完整 10 槽位机架前端与增效工具管理器",
+  "tags": [
+    "Theme"
+  ]
+}

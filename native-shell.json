@@ -1,0 +1,22 @@
+{
+  "type": "echo-workshop-native-shell",
+  "schemaVersion": 1,
+  "id": "echo.vst3-rack",
+  "title": "VST3 效果组与机架",
+  "description": "专业 10 槽位 VST3 效果器机架与音频增效工具管理器，支持实时音频渲染与 VST3 原生 UI 交互。",
+  "protocolVersion": 1,
+  "platforms": [
+    "win32"
+  ],
+  "exe": "bin/echo-vst3-host.exe",
+  "renderer": "mod.js",
+  "config": "config.json",
+  "configSchema": "config.schema.json",
+  "permissions": [
+    "process:spawn",
+    "ipc:named-pipe",
+    "shell:taskbar",
+    "playback:read",
+    "playback:control"
+  ]
+}

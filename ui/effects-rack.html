@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VST3 效果组与机架</title>
+  <link rel="stylesheet" href="effects-rack.css">
+</head>
+<body class="audition-theme">
+  <div class="effects-rack-panel" id="effects-rack-panel">
+    <!-- Panel Header -->
+    <header class="rack-header">
+      <div class="header-tab">
+        <span class="tab-title">VST3 效果组与机架</span>
+        <div class="header-actions-right">
+          <button class="btn-theme-toggle" id="btn-theme-toggle" title="切换日间/夜间模式">
+            <span id="theme-toggle-icon">🌙</span>
+          </button>
+          <button class="btn-icon btn-close" id="btn-close-rack" title="关闭面板">关闭</button>
+        </div>
+      </div>
+      <div class="header-controls">
+        <div class="preset-group">
+          <label class="control-label" for="rack-preset">预设:</label>
+          <select id="rack-preset" class="audition-select">
+            <option value="default">[默认 (清空机架)]</option>
+            <optgroup label="── iZotope 母带与听感 ──">
+              <option value="master-air">【母带增强】空间与通透感 (EQ + Imager + Maximizer)</option>
+              <option value="warm-tape">【温暖黑胶】模拟磁带暖感 (Tape + EQ + Comp)</option>
+              <option value="bass-punch">【重低音动感】低频冲击力 (Transient + Low End + Maximizer)</option>
+              <option value="space-reverb">【流行空间】宽广声场混响 (Imager + Neoverb + Maximizer)</option>
+            </optgroup>
+            <optgroup label="── 人声处理与精修 ──">
+              <option value="vocal-clarity">【清晰人声】人声突出去噪 (De-noise + Nectar/EQ + Comp)</option>
+              <option value="radio-podcast">【播客电台】主播降噪广播音质 (De-noise + De-click + Comp)</option>
+              <option value="melodyne-pitch">【人声精修】Melodyne 音高校准 (Melodyne + EQ + Maximizer)</option>
+            </optgroup>
+            <optgroup label="── 用户自定义预设 ──" id="preset-custom-group">
+            </optgroup>
+          </select>
+          <button class="btn-text btn-preset" id="btn-save-preset" title="保存自定义预设">保存</button>
+          <button class="btn-text btn-preset" id="btn-delete-preset" title="删除自定义预设">删除</button>
+          <button class="btn-text btn-preset" id="btn-import-preset" title="从 JSON 文件导入机架预设">导入</button>
+          <button class="btn-text btn-preset" id="btn-export-preset" title="将当前机架预设导出为 JSON 文件">导出</button>
+          <input type="file" id="preset-file-input" accept=".json" style="display:none;">
+        </div>
+        <div class="track-info">
+          <span class="info-label">当前音频:</span>
+          <span class="info-value" id="current-track-name">未在播放</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 10 Slots Container -->
+    <main class="rack-slots" id="rack-slots">
+      <!-- Generated 10 slots dynamically via JS -->
+    </main>
+
+    <!-- Master Controls Section -->
+    <footer class="rack-footer">
+      <!-- Master Gains & Mix -->
+      <div class="gain-controls">
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>输入增益</span>
+            <span class="slider-num" id="input-gain-text">0.0 dB</span>
+          </div>
+          <input type="range" id="input-gain-slider" min="-24" max="24" step="0.5" value="0">
+        </div>
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>输出增益</span>
+            <span class="slider-num" id="output-gain-text">0.0 dB</span>
+          </div>
+          <input type="range" id="output-gain-slider" min="-24" max="24" step="0.5" value="0">
+        </div>
+        <div class="slider-group">
+          <div class="slider-header">
+            <span>混音 (干/湿)</span>
+            <span class="slider-num" id="mix-text">100 %</span>
+          </div>
+          <input type="range" id="mix-slider" min="0" max="100" step="1" value="100">
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="rack-actions">
+        <button class="btn-master-power active" id="btn-master-power" title="全局效果开关 (旁通所有槽位)">
+          <span class="power-glyph">⏻</span>
+          <span class="power-text">效果已激活</span>
+        </button>
+        <button class="btn-audition" id="btn-monitor-audio" title="实时监听当前曲目经 VST3 渲染的声音">
+          <span id="monitor-text">实时监听: 关</span>
+        </button>
+        <button class="btn-audition" id="btn-render-track" title="仅支持本地曲目：独占批处理渲染当前曲目并保存到已渲染库">
+          <span id="render-text">渲染到曲目</span>
+        </button>
+        <button class="btn-audition" id="btn-batch-render" title="选择电脑上的任意本地音频文件进行 VST3 批处理导出">
+          <span id="batch-render-text">批处理渲染文件...</span>
+        </button>
+        <input type="file" id="batch-audio-input" accept="audio/*,.mp3,.flac,.wav,.ogg,.m4a,.aac" style="display:none;">
+        <button class="btn-audition" id="btn-open-plugin-manager">
+          <span>增效工具管理器...</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Plugin Context Menu / Selector Modal -->
+  <div class="plugin-selector-modal" id="plugin-selector-modal" hidden>
+    <div class="plugin-selector-content">
+      <div class="selector-header">
+        <span class="selector-title">选择 VST3 增效工具</span>
+        <button class="btn-icon" id="btn-close-selector">关闭</button>
+      </div>
+      <div class="selector-search">
+        <input type="text" id="selector-search-input" placeholder="快速搜索效果器...">
+      </div>
+      <div class="selector-list" id="selector-list">
+        <!-- Injected list of available VST3 plugins -->
+      </div>
+    </div>
+  </div>
+
+  <script src="effects-rack.js"></script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+{
+  "type": "echo-workshop-item",
+  "schemaVersion": 1,
+  "id": "echo.vst3-rack",
+  "title": "ECHO VST3 效果组与效果机架",
+  "version": "1.0.0",
+  "content": {
+    "kind": "theme",
+    "entry": "theme.json"
+  },
+  "compatibility": {
+    "minEchoVersion": "26.8.0"
+  },
+  "files": [
+    {
+      "path": "assets/vst3-icon.png",
+      "size": 583768,
+      "sha256": "6e53e27bacf24117be0eb68f4db8c4202dc582cc33f3e2a3b9d3720e48778fb0"
+    },
+    {
+      "path": "bin/echo-vst3-host.bin",
+      "size": 151552,
+      "sha256": "23e011241ec2e4484d5d86de9ec3e4fe6b6a47074d49a881a7375715372ab8ef"
+    },
+    {
+      "path": "config.json",
+      "size": 94,
+      "sha256": "2d4ac2d315445edcb1045e0f80f967542fa6b8946c05f8a40ac4b93b0ed92cb2"
+    },
+    {
+      "path": "config.schema.json",
+      "size": 1053,
+      "sha256": "56e5ef7a2a44dc9ea2432adbeef237290437e10822e40c693ed465ed8b21f5b6"
+    },
+    {
+      "path": "echo.mod.json",
+      "size": 214,
+      "sha256": "f87bafd23b78cc6692956ceb0e5df0f2679f6e570a05f746dc546c0cb253f33a"
+    },
+    {
+      "path": "main.cjs",
+      "size": 9295,
+      "sha256": "ca0ada76b7a42ed711b2586e6a22044b66421c03834e6c7c57a57d4d49e9f2d9"
+    },
+    {
+      "path": "mod.js",
+      "size": 25517,
+      "sha256": "9238e65741614ce652871fd9faa8d0c6888c046f948f0ca744dc962e02b1734c"
+    },
+    {
+      "path": "package.json",
+      "size": 188,
+      "sha256": "6d6a00e661c2dccccb492388f9d025f66f36ab85a3b747de70c42e64f517e44a"
+    },
+    {
+      "path": "theme.json",
+      "size": 375,
+      "sha256": "0bc1a8441d584cf29ab8ef173fae64cb246285205f00ff39a6dd53ce585ff872"
+    },
+    {
+      "path": "ui/effects-rack.css",
+      "size": 15253,
+      "sha256": "8cb988461a8cbcad7b8a5a05db38d679939a7fd9e3c48b55eb27b67754b762e8"
+    },
+    {
+      "path": "ui/effects-rack.html",
+      "size": 6203,
+      "sha256": "4473f4f3de05f3f57297f45929ea61c4dd8420168069bb3666c5688539f1e1d2"
+    },
+    {
+      "path": "ui/effects-rack.js",
+      "size": 33491,
+      "sha256": "5217c949d017168868d567a77ba104dfae40813e67af24ef012812cf50f8cedb"
+    },
+    {
+      "path": "ui/plugin-manager.css",
+      "size": 6940,
+      "sha256": "4717f6891d928c79f928686f31ce6d29c846fe76c56f08b3a9eb0975c588f1f4"
+    },
+    {
+      "path": "ui/plugin-manager.html",
+      "size": 3699,
+      "sha256": "6f6e27d05de5d1e41ae585bc0ddc2cd9f2a9e0eab6a64bfb98d31aaef48e59f0"
+    },
+    {
+      "path": "ui/plugin-manager.js",
+      "size": 10855,
+      "sha256": "f2b03c1e0c6d96bb356891e4e526979be71eb1e0ff9a147067296ebbf0e4c920"
+    }
+  ],
+  "license": {
+    "id": "MIT",
+    "holder": "Xeon"
+  }
+}

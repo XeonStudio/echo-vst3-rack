@@ -1,0 +1,6 @@
+{
+  "hostPort": 17892,
+  "autoStartHost": true,
+  "showConsole": false,
+  "defaultMix": 100
+}

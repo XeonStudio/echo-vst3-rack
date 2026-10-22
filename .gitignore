@@ -1,0 +1,22 @@
+# .NET build artifacts
+**/[Bb]in/[Dd]ebug/
+**/[Bb]in/[Rr]elease/
+**/[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Only track distributed mod runtime in top-level bin/
+!/bin/
+!/bin/**
+*.bak
+
+# IDE & Editor
+.vs/
+.vscode/
+
+# OS generated
+.DS_Store
+Thumbs.db
+Desktop.ini

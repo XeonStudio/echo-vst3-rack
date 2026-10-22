@@ -1,0 +1,17 @@
+{
+  "type": "echo-workshop-theme-preset",
+  "schemaVersion": 1,
+  "id": "echo.vst3-rack",
+  "title": "ECHO VST3 效果组与效果机架【适配中，暂不可用】",
+  "basePreset": "classic",
+  "dark": {
+    "appBg": "#1e1e1e",
+    "panel": "#252526",
+    "accent": "#007acc"
+  },
+  "light": {
+    "appBg": "#f3f3f3",
+    "panel": "#ffffff",
+    "accent": "#007acc"
+  }
+}

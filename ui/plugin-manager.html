@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VST3 音频增效工具管理器</title>
+  <link rel="stylesheet" href="plugin-manager.css">
+</head>
+<body class="audition-theme">
+  <div class="manager-dialog">
+    <!-- Header -->
+    <header class="dialog-header">
+      <span class="dialog-title">音频增效工具管理器</span>
+      <button class="btn-close" id="btn-close-dialog" title="关闭">✕</button>
+    </header>
+
+    <!-- Content -->
+    <div class="dialog-body">
+      <!-- Section 1: VST Folders -->
+      <section class="section-folders">
+        <label class="section-label">VST 效果文件夹:</label>
+        <div class="folders-layout">
+          <div class="folders-listbox" id="folders-list">
+            <div class="folder-row selected">C:\Program Files\Common Files\VST3</div>
+            <div class="folder-row">C:\Program Files\Common Files\VST3\iZotope</div>
+            <div class="folder-row">C:\Program Files\VSTPlugins</div>
+          </div>
+          <div class="folders-actions">
+            <button class="btn-audition" id="btn-add-file">添加单个插件 (.vst3)...</button>
+            <button class="btn-audition" id="btn-add-folder">添加文件夹...</button>
+            <button class="btn-audition" id="btn-remove-folder">移除</button>
+            <button class="btn-audition" id="btn-default-folders">默认值</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Scanning & Filter Bar -->
+      <section class="section-controls">
+        <div class="scan-group">
+          <button class="btn-audition btn-primary" id="btn-scan-plugins">
+            <span class="scan-icon" id="scan-spinner">🔍</span>
+            <span id="scan-btn-text">扫描增效工具</span>
+          </button>
+          <label class="checkbox-label">
+            <input type="checkbox" id="chk-rescan-existing">
+            <span>重新扫描现有增效工具</span>
+          </label>
+        </div>
+
+        <div class="bulk-and-filter">
+          <button class="btn-audition" id="btn-enable-all">全部启用</button>
+          <button class="btn-audition" id="btn-disable-all">全部禁用</button>
+          <div class="search-box">
+            <input type="text" id="plugin-search-input" placeholder="搜索增效工具...">
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Available Plug-ins Table -->
+      <section class="section-table">
+        <div class="table-container">
+          <table class="plugin-table" id="plugin-table">
+            <thead>
+              <tr>
+                <th class="col-chk"><input type="checkbox" id="chk-select-all" checked></th>
+                <th class="col-status">状态</th>
+                <th class="col-name">效果名称</th>
+                <th class="col-type">类型</th>
+                <th class="col-cat">类别</th>
+                <th class="col-vendor">供应商</th>
+                <th class="col-path">位置</th>
+              </tr>
+            </thead>
+            <tbody id="plugin-table-body">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="dialog-footer">
+      <div class="stats-text" id="stats-text">正在读取增效工具列表...</div>
+      <div class="footer-buttons">
+        <button class="btn-audition btn-primary" id="btn-ok">确定</button>
+        <button class="btn-audition" id="btn-cancel">取消</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="plugin-manager.js"></script>
+</body>
+</html>

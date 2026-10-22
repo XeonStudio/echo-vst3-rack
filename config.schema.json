@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VST3 效果组配置",
+  "type": "object",
+  "properties": {
+    "hostPort": {
+      "type": "integer",
+      "title": "VST3 宿主端口",
+      "description": "C# 原生 VST3 宿主进程 HTTP 监听端口 (默认 17892)",
+      "default": 17892,
+      "minimum": 1024,
+      "maximum": 65535
+    },
+    "autoStartHost": {
+      "type": "boolean",
+      "title": "自动启动宿主",
+      "description": "启动 ECHO 时自动拉起 VST3 宿主后台服务",
+      "default": true
+    },
+    "showConsole": {
+      "type": "boolean",
+      "title": "显示宿主控制台黑框 (调试模式)",
+      "description": "开发排查时显示 C# 宿主黑框控制台，平时建议关闭保持静默运行",
+      "default": false
+    },
+    "defaultMix": {
+      "type": "integer",
+      "title": "默认干湿比 (%)",
+      "description": "机架初始化时的效果干湿混合百分比 (0-100)",
+      "default": 100,
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}
