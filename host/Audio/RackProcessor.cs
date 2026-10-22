@@ -87,6 +87,34 @@ public class RackProcessor : IDisposable
         GetSlot(index).CloseEditor();
     }
 
+    public void TriggerTransportRestart(int pauseBlocks = 100)
+    {
+        lock (_gate)
+        {
+            foreach (var slot in _slots)
+            {
+                if (slot.HasPlugin && slot.Instance != null)
+                {
+                    slot.Instance.TriggerTransportRestart(pauseBlocks);
+                }
+            }
+        }
+    }
+
+    public void SetTransportPlaying(bool playing)
+    {
+        lock (_gate)
+        {
+            foreach (var slot in _slots)
+            {
+                if (slot.HasPlugin && slot.Instance != null)
+                {
+                    slot.Instance.SetTransportPlaying(playing);
+                }
+            }
+        }
+    }
+
 
     public void UpdateFormat(double sampleRate, int channels)
     {

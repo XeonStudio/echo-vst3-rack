@@ -1,6 +1,6 @@
 {
   "name": "echo-vst3-rack",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "VST3 Effects Rack & Plug-in Manager for ECHO Player",
   "main": "main.cjs",
   "author": "Xeon",

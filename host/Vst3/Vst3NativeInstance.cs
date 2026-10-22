@@ -97,11 +97,54 @@ public sealed class Vst3NativeInstance : IDisposable
 
 	private int _allocatedOutBusses;
 
+	private readonly Vst3ParameterChangesImpl _outputParamChanges = new Vst3ParameterChangesImpl();
+	private nint _outputParamChangesCcw = IntPtr.Zero;
+
+	private float[]? _silentBuffer;
+	private GCHandle _silentHandle;
+	private nint _silentChannelBuffersPtr = IntPtr.Zero;
+
+	private float[]? _scratchOutBuffer;
+	private GCHandle _scratchOutHandle;
+	private nint _scratchOutChannelBuffersPtr = IntPtr.Zero;
+
+	public int NumInputBusses => _numInputBusses;
+	public int NumOutputBusses => _numOutputBusses;
+	public int ConnectionPointResult1 { get; private set; }
+	public int ConnectionPointResult2 { get; private set; }
+	public int LastProcessResult { get; private set; }
+	public long ProcessCount { get; private set; }
+	public float LastInPeak { get; private set; }
+	public float LastOutPeak { get; private set; }
+
 	private readonly object _lock = new object();
 
 	private nint _processContextPtr = IntPtr.Zero;
 
 	private long _continuousSampleTime;
+	private int _transportResetCountdown = 0;
+	private bool _transportPaused = false;
+
+	public void SetTransportPlaying(bool playing)
+	{
+		lock (_lock)
+		{
+			_transportPaused = !playing;
+			if (!playing)
+			{
+				_continuousSampleTime = 0;
+			}
+		}
+	}
+
+	public void TriggerTransportRestart(int pauseBlocks = 100)
+	{
+		lock (_lock)
+		{
+			_continuousSampleTime = 0;
+			_transportResetCountdown = pauseBlocks;
+		}
+	}
 
 	private static readonly List<GCHandle> _pins = new List<GCHandle>();
 
@@ -253,23 +296,23 @@ public sealed class Vst3NativeInstance : IDisposable
 			{
 				_controllerCp = Vst3Com.ToManaged<IConnectionPoint>(_controllerCpRaw);
 			}
-			DetermineChannels();
 			if (Vst3NativeHost.UseStereoArrangement)
 			{
 				ApplyStereoArrangement();
 			}
+			DetermineChannels();
 			try
 			{
-				if (_componentCp != null && _controllerCp != null)
+				if (_componentCpRaw != IntPtr.Zero && _controllerCpRaw != IntPtr.Zero)
 				{
-					_componentCp.Connect(_controllerCpRaw);
-					_controllerCp.Connect(_componentCpRaw);
-					Db("connection points connected");
+					ConnectionPointResult1 = ConnectConnectionPoints(_componentCpRaw, _controllerCpRaw);
+					ConnectionPointResult2 = ConnectConnectionPoints(_controllerCpRaw, _componentCpRaw);
+					Console.WriteLine($"[echo-vst3-host] IConnectionPoint connected: comp->ctrl: 0x{ConnectionPointResult1:X8}, ctrl->comp: 0x{ConnectionPointResult2:X8}");
 				}
 			}
 			catch (Exception ex)
 			{
-				Db("connect failed: " + ex.Message);
+				Console.WriteLine("[echo-vst3-host] Connection point connect failed: " + ex.Message);
 			}
 			ProcessSetup setup = new ProcessSetup
 			{
@@ -288,12 +331,14 @@ public sealed class Vst3NativeInstance : IDisposable
 			_processor.SetProcessing(1);
 			_processingEnabled = true;
 			_paramChangesCcw = Vst3Com.ToNative((IParameterChangesCom)_paramChanges);
+			_outputParamChangesCcw = Vst3Com.ToNative((IParameterChangesCom)_outputParamChanges);
 			if (_processContextPtr == IntPtr.Zero)
 			{
 				_processContextPtr = Marshal.AllocHGlobal(Marshal.SizeOf<Vst3ProcessContext>());
 			}
 			_continuousSampleTime = 0;
 			EnsureBuffers(_maxBlock, _inChannels, _outChannels);
+			SyncComponentStateToController();
 			return null;
 		}
 		catch (Exception ex2)
@@ -310,6 +355,26 @@ public sealed class Vst3NativeInstance : IDisposable
 			return IntPtr.Zero;
 		}
 		return ppv;
+	}
+
+	[UnmanagedFunctionPointer(CallingConvention.StdCall)]
+	private delegate int ConnectFn(nint thisPtr, nint other);
+
+	private static int ConnectConnectionPoints(nint sourceCp, nint targetCp)
+	{
+		if (sourceCp == IntPtr.Zero || targetCp == IntPtr.Zero) return -1;
+		try
+		{
+			nint vTable = Marshal.ReadIntPtr(sourceCp);
+			nint fnPtr = Marshal.ReadIntPtr(vTable, 3 * IntPtr.Size);
+			var fn = Marshal.GetDelegateForFunctionPointer<ConnectFn>(fnPtr);
+			return fn(sourceCp, targetCp);
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine("[echo-vst3-host] ConnectConnectionPoints error: " + ex.Message);
+			return -2147467259;
+		}
 	}
 
 	private static int CreateInstance(IPluginFactory factory, byte[] cid, byte[] iid, out nint obj)
@@ -467,19 +532,19 @@ public sealed class Vst3NativeInstance : IDisposable
 			}
 			int num = Math.Max(1, _component.GetBusCount(0, 0));
 			int num2 = Math.Max(1, _component.GetBusCount(0, 1));
-			uint[] array = new uint[num];
-			uint[] array2 = new uint[num2];
+			ulong[] array = new ulong[num];
+			ulong[] array2 = new ulong[num2];
 			for (int i = 0; i < num; i++)
 			{
-				array[i] = 3u;
+				array[i] = 3UL;
 			}
 			for (int j = 0; j < num2; j++)
 			{
-				array2[j] = 3u;
+				array2[j] = 3UL;
 			}
-			fixed (uint* inputs = array)
+			fixed (ulong* inputs = array)
 			{
-				fixed (uint* outputs = array2)
+				fixed (ulong* outputs = array2)
 				{
 					_processor.SetBusArrangements((nint)inputs, num, (nint)outputs, num2);
 				}
@@ -698,6 +763,24 @@ public sealed class Vst3NativeInstance : IDisposable
 			}
 			_outAudioBusBuffersPtr = IntPtr.Zero;
 		}
+		if (_silentHandle.IsAllocated)
+		{
+			try { _silentHandle.Free(); } catch {}
+		}
+		if (_silentChannelBuffersPtr != IntPtr.Zero)
+		{
+			try { Marshal.FreeHGlobal(_silentChannelBuffersPtr); } catch {}
+			_silentChannelBuffersPtr = IntPtr.Zero;
+		}
+		if (_scratchOutHandle.IsAllocated)
+		{
+			try { _scratchOutHandle.Free(); } catch {}
+		}
+		if (_scratchOutChannelBuffersPtr != IntPtr.Zero)
+		{
+			try { Marshal.FreeHGlobal(_scratchOutChannelBuffersPtr); } catch {}
+			_scratchOutChannelBuffersPtr = IntPtr.Zero;
+		}
 		_allocatedFrames = 0;
 		_allocatedInChannels = 0;
 		_allocatedOutChannels = 0;
@@ -750,31 +833,77 @@ public sealed class Vst3NativeInstance : IDisposable
 				}
 			}
 
+			// Measure input peak level
+			float pIn = 0f;
+			for (int pi = 0; pi < num2; pi++)
+			{
+				float[] inArr = _inPlanar[pi];
+				for (int pk = 0; pk < num; pk++)
+				{
+					float a = Math.Abs(inArr[pk]);
+					if (a > pIn) pIn = a;
+				}
+			}
+			LastInPeak = pIn;
+
+			// Clear output planar buffers before process
+			for (int oj = 0; oj < _outChannels; oj++)
+			{
+				Array.Clear(_outPlanar[oj], 0, num);
+			}
+
+			// Ensure main input bus SilenceFlags is 0 (has active signal)
+			if (_inAudioBusBuffersPtr != IntPtr.Zero)
+			{
+				Marshal.WriteInt64(_inAudioBusBuffersPtr, 8, 0L);
+			}
+
 			int num4 = Math.Max(1, _numInputBusses);
 			int num5 = Math.Max(1, _numOutputBusses);
 			try
 			{
 				if (_processContextPtr != IntPtr.Zero)
 				{
-					_continuousSampleTime += num;
+					bool isTransportPlaying = !_transportPaused;
+					if (_transportResetCountdown > 0)
+					{
+						_transportResetCountdown--;
+						isTransportPlaying = (_transportResetCountdown == 0 && !_transportPaused);
+						if (!isTransportPlaying)
+						{
+							_continuousSampleTime = 0;
+						}
+					}
+
+					long blockStartSamples = _continuousSampleTime;
+					if (isTransportPlaying)
+					{
+						_continuousSampleTime += num;
+					}
+
 					double currentSr = _sampleRate > 0 ? _sampleRate : 48000.0;
 					double tempo = 120.0;
-					double projectTimeMusic = (_continuousSampleTime / currentSr) * (tempo / 60.0);
-					double barPositionMusic = projectTimeMusic % 4.0;
+					double projectTimeMusic = (blockStartSamples / currentSr) * (tempo / 60.0);
+					double barPositionMusic = projectTimeMusic - (projectTimeMusic % 4.0);
+
+					uint stateFlags = (uint)(ProcessContextStates.kSystemTimeValid |
+										   ProcessContextStates.kContTimeValid |
+										   ProcessContextStates.kProjectTimeMusicValid |
+										   ProcessContextStates.kBarPositionValid |
+										   ProcessContextStates.kTempoValid |
+										   ProcessContextStates.kTimeSigValid);
+					if (isTransportPlaying)
+					{
+						stateFlags |= (uint)ProcessContextStates.kPlaying;
+					}
 
 					var context = new Vst3ProcessContext
 					{
-						State = (uint)(ProcessContextStates.kPlaying |
-									   ProcessContextStates.kSystemTimeValid |
-									   ProcessContextStates.kContTimeValid |
-									   ProcessContextStates.kProjectTimeMusicValid |
-									   ProcessContextStates.kBarPositionValid |
-									   ProcessContextStates.kTempoValid |
-									   ProcessContextStates.kTimeSigValid),
+						State = stateFlags,
 						SampleRate = currentSr,
-						ProjectTimeSamples = _continuousSampleTime,
-						ContinousTimeSamples = _continuousSampleTime,
-						SystemTime = (long)(DateTime.UtcNow.Ticks * 100),
+						ProjectTimeSamples = blockStartSamples,
+						ContinousTimeSamples = blockStartSamples,
+						SystemTime = (long)((System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency) * 1_000_000_000.0),
 						ProjectTimeMusic = projectTimeMusic,
 						BarPositionMusic = barPositionMusic,
 						CycleStartMusic = 0.0,
@@ -785,7 +914,6 @@ public sealed class Vst3NativeInstance : IDisposable
 						ChordKey = 0,
 						ChordRoot = 0,
 						ChordMask = 0,
-						ChordType = 0,
 						SmpteOffsetSubframes = 0,
 						FrameRateFramesPerSecond = 30,
 						FrameRateFlags = 0,
@@ -804,23 +932,40 @@ public sealed class Vst3NativeInstance : IDisposable
 					Inputs = _inAudioBusBuffersPtr,
 					Outputs = _outAudioBusBuffersPtr,
 					InputParameterChanges = ((!Vst3NativeHost.UseParameterChanges) ? IntPtr.Zero : (Vst3NativeHost.HackParamPointer ? _hostContextCcw : _paramChangesCcw)),
-					OutputParameterChanges = IntPtr.Zero,
+					OutputParameterChanges = _outputParamChangesCcw,
 					InputEvents = IntPtr.Zero,
 					OutputEvents = IntPtr.Zero,
 					ProcessContext = _processContextPtr
 				};
 				int num11 = _processor.Process(ref data);
+				LastProcessResult = num11;
+				ProcessCount++;
+
+				if (_outputParamChanges.GetParameterCount() > 0)
+				{
+					var changes = _outputParamChanges.DrainChanges();
+					if (_controller != null)
+					{
+						foreach (var (pid, val) in changes)
+						{
+							try { _controller.SetParamNormalized(pid, val); } catch {}
+						}
+					}
+				}
+
 				if (num11 != 0)
 				{
 					return true;
 				}
 			}
-			catch
+			catch (Exception ex)
 			{
+				Console.WriteLine("[echo-vst3-host] Process exception: " + ex.Message);
 				return true;
 			}
 
 			int num12 = Math.Min(channels, _outChannels);
+			float pOut = 0f;
 			for (int num13 = 0; num13 < num12; num13++)
 			{
 				float[] array2 = _outPlanar[num13];
@@ -828,17 +973,24 @@ public sealed class Vst3NativeInstance : IDisposable
 				{
 					for (int num14 = 0; num14 < num; num14++)
 					{
-						interleaved[num14] = array2[num14];
+						float val = array2[num14];
+						interleaved[num14] = val;
+						float a = Math.Abs(val);
+						if (a > pOut) pOut = a;
 					}
 				}
 				else
 				{
 					for (int num15 = 0; num15 < num; num15++)
 					{
-						interleaved[num15 * channels + num13] = array2[num15];
+						float val = array2[num15];
+						interleaved[num15 * channels + num13] = val;
+						float a = Math.Abs(val);
+						if (a > pOut) pOut = a;
 					}
 				}
 			}
+			LastOutPeak = pOut;
 			return true;
 		}
 	}
@@ -888,15 +1040,33 @@ public sealed class Vst3NativeInstance : IDisposable
 			Marshal.WriteIntPtr(_outChannelBuffersPtr, j * IntPtr.Size, _outHandles[j].AddrOfPinnedObject());
 		}
 
+		_silentBuffer = new float[requiredFrames];
+		_silentHandle = GCHandle.Alloc(_silentBuffer, GCHandleType.Pinned);
+		int auxInCh = Math.Max(2, inCh);
+		_silentChannelBuffersPtr = Marshal.AllocHGlobal(IntPtr.Size * auxInCh);
+		for (int s = 0; s < auxInCh; s++)
+		{
+			Marshal.WriteIntPtr(_silentChannelBuffersPtr, s * IntPtr.Size, _silentHandle.AddrOfPinnedObject());
+		}
+
+		_scratchOutBuffer = new float[requiredFrames];
+		_scratchOutHandle = GCHandle.Alloc(_scratchOutBuffer, GCHandleType.Pinned);
+		int auxOutCh = Math.Max(2, outCh);
+		_scratchOutChannelBuffersPtr = Marshal.AllocHGlobal(IntPtr.Size * auxOutCh);
+		for (int s = 0; s < auxOutCh; s++)
+		{
+			Marshal.WriteIntPtr(_scratchOutChannelBuffersPtr, s * IntPtr.Size, _scratchOutHandle.AddrOfPinnedObject());
+		}
+
 		int busSize = Marshal.SizeOf<AudioBusBuffers>();
 		_inAudioBusBuffersPtr = Marshal.AllocHGlobal(busSize * numInBusses);
 		for (int n = 0; n < numInBusses; n++)
 		{
 			Marshal.StructureToPtr(new AudioBusBuffers
 			{
-				NumChannels = inCh,
-				SilenceFlags = (ulong)((n == 0) ? 0 : ((1L << inCh) - 1)),
-				ChannelBuffers = _inChannelBuffersPtr
+				NumChannels = (n == 0) ? inCh : 2,
+				SilenceFlags = (n == 0) ? 0UL : ulong.MaxValue,
+				ChannelBuffers = (n == 0) ? _inChannelBuffersPtr : _silentChannelBuffersPtr
 			}, _inAudioBusBuffersPtr + n * busSize, fDeleteOld: false);
 		}
 
@@ -905,9 +1075,9 @@ public sealed class Vst3NativeInstance : IDisposable
 		{
 			Marshal.StructureToPtr(new AudioBusBuffers
 			{
-				NumChannels = outCh,
-				SilenceFlags = (ulong)((m == 0) ? 0 : ((1L << outCh) - 1)),
-				ChannelBuffers = _outChannelBuffersPtr
+				NumChannels = (m == 0) ? outCh : 2,
+				SilenceFlags = (m == 0) ? 0UL : ulong.MaxValue,
+				ChannelBuffers = (m == 0) ? _outChannelBuffersPtr : _scratchOutChannelBuffersPtr
 			}, _outAudioBusBuffersPtr + m * busSize, fDeleteOld: false);
 		}
 
@@ -922,6 +1092,9 @@ public sealed class Vst3NativeInstance : IDisposable
 	{
 		_paramChanges.SetValue(id, value);
 	}
+
+	[DllImport("user32.dll")]
+	private static extern uint GetDpiForWindow(nint hWnd);
 
 	public unsafe string? OpenEditor(nint parentHwnd, out int width, out int height)
 	{
@@ -1053,7 +1226,6 @@ public sealed class Vst3NativeInstance : IDisposable
 				}
 			}
 			catch {}
-
 			sup = _view.Attached(parentHwnd, hwndPlatformPtr);
 			if (sup != 0)
 			{
@@ -1242,6 +1414,18 @@ public sealed class Vst3NativeInstance : IDisposable
 			if (_paramChangesCcw != IntPtr.Zero)
 			{
 				Marshal.Release(_paramChangesCcw);
+				_paramChangesCcw = IntPtr.Zero;
+			}
+		}
+		catch
+		{
+		}
+		try
+		{
+			if (_outputParamChangesCcw != IntPtr.Zero)
+			{
+				Marshal.Release(_outputParamChangesCcw);
+				_outputParamChangesCcw = IntPtr.Zero;
 			}
 		}
 		catch
@@ -1289,5 +1473,39 @@ public sealed class Vst3NativeInstance : IDisposable
 		{
 		}
 		return null;
+	}
+
+	public bool SyncComponentStateToController()
+	{
+		if (_component == null || _controller == null)
+		{
+			return false;
+		}
+		try
+		{
+			var stream = new Vst3MemoryStreamImpl();
+			nint streamNative = Vst3Com.ToNative<IBStreamCom>(stream);
+			try
+			{
+				int resGet = _component.GetState(streamNative);
+				Console.WriteLine($"[echo-vst3-host] SyncComponentState ({DisplayName}): component.GetState returned 0x{resGet:X8}, bytes = {stream.Length}");
+				if (resGet == 0 && stream.Length > 0)
+				{
+					stream.Seek(0, 0, IntPtr.Zero);
+					int resSet = _controller.SetComponentState(streamNative);
+					Console.WriteLine($"[echo-vst3-host] SyncComponentState ({DisplayName}): controller.SetComponentState returned 0x{resSet:X8}");
+					return resSet == 0;
+				}
+			}
+			finally
+			{
+				Marshal.Release(streamNative);
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"[echo-vst3-host] SyncComponentState ({DisplayName}) exception: {ex.Message}");
+		}
+		return false;
 	}
 }

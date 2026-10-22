@@ -101,6 +101,9 @@ public sealed class Vst3EditorWindow : IDisposable
     [DllImport("user32.dll")]
     private static extern bool AdjustWindowRectEx(ref RECT lpRect, uint dwStyle, bool bMenu, uint dwExStyle);
 
+    [DllImport("user32.dll")]
+    private static extern bool GetClientRect(nint hWnd, out RECT rect);
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern nint GetModuleHandleW(string? name);
 
@@ -171,10 +174,15 @@ public sealed class Vst3EditorWindow : IDisposable
 
                 int targetW = Math.Max(640, width);
                 int targetH = Math.Max(480, height);
-                RECT rect = new RECT { Left = 0, Top = 0, Right = targetW, Bottom = targetH };
-                AdjustWindowRectEx(ref rect, WS_OVERLAPPEDWINDOW, false, 0);
-                int winW = rect.Right - rect.Left;
-                int winH = rect.Bottom - rect.Top;
+                RECT wr, cr;
+                GetWindowRect(_hwnd, out wr);
+                GetClientRect(_hwnd, out cr);
+                int nonClientW = (wr.Right - wr.Left) - (cr.Right - cr.Left);
+                int nonClientH = (wr.Bottom - wr.Top) - (cr.Bottom - cr.Top);
+                if (nonClientW <= 0 || nonClientW > 100) nonClientW = 16;
+                if (nonClientH <= 0 || nonClientH > 100) nonClientH = 39;
+                int winW = targetW + nonClientW;
+                int winH = targetH + nonClientH;
 
                 SetWindowPos(_hwnd, IntPtr.Zero, 100, 100, winW, winH, SWP_NOZORDER);
                 ShowWindow(_hwnd, SW_SHOW);
@@ -245,10 +253,15 @@ public sealed class Vst3EditorWindow : IDisposable
     {
         if (_hwnd != IntPtr.Zero && !_closed)
         {
-            RECT rect = new RECT { Left = 0, Top = 0, Right = width, Bottom = height };
-            AdjustWindowRectEx(ref rect, WS_OVERLAPPEDWINDOW, false, 0);
-            int winW = rect.Right - rect.Left;
-            int winH = rect.Bottom - rect.Top;
+            RECT wr, cr;
+            GetWindowRect(_hwnd, out wr);
+            GetClientRect(_hwnd, out cr);
+            int nonClientW = (wr.Right - wr.Left) - (cr.Right - cr.Left);
+            int nonClientH = (wr.Bottom - wr.Top) - (cr.Bottom - cr.Top);
+            if (nonClientW <= 0 || nonClientW > 100) nonClientW = 16;
+            if (nonClientH <= 0 || nonClientH > 100) nonClientH = 39;
+            int winW = width + nonClientW;
+            int winH = height + nonClientH;
             SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, winW, winH, 0x0002 /* SWP_NOMOVE */ | SWP_NOZORDER);
             _instance.EditorResized(width, height);
         }

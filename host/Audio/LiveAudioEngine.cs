@@ -45,15 +45,73 @@ public class LiveAudioEngine : IDisposable
     private System.Threading.Timer? _reconnectTimer;
     private string? _activeDeviceId;
 
+    private NAudio.CoreAudioApi.MMDevice? FindEchoRenderDevice(NAudio.CoreAudioApi.MMDeviceEnumerator enumerator)
+    {
+        try
+        {
+            var endpoints = enumerator.EnumerateAudioEndPoints(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.DeviceState.Active);
+
+            // 1. Look for device where an ECHO audio process (echo-audio-host or ECHO) has an active session
+            foreach (var endpoint in endpoints)
+            {
+                try
+                {
+                    var sessionManager = endpoint.AudioSessionManager;
+                    if (sessionManager == null) continue;
+                    var sessions = sessionManager.Sessions;
+                    for (int i = 0; i < sessions.Count; i++)
+                    {
+                        var session = sessions[i];
+                        uint pid = session.GetProcessID;
+                        if (pid > 0)
+                        {
+                            try
+                            {
+                                var proc = Process.GetProcessById((int)pid);
+                                string procName = proc.ProcessName.ToLowerInvariant();
+                                if (procName.Contains("echo") && !procName.Contains("echo-vst3-host"))
+                                {
+                                    Console.WriteLine($"[LiveAudioEngine] Detected ECHO audio session (PID {pid}, {proc.ProcessName}) on device: {endpoint.FriendlyName}");
+                                    return endpoint;
+                                }
+                            }
+                            catch {}
+                        }
+                    }
+                }
+                catch {}
+            }
+
+            // 2. Look for device with active audio playback (peak meter > 0)
+            foreach (var endpoint in endpoints)
+            {
+                try
+                {
+                    var meter = endpoint.AudioMeterInformation;
+                    if (meter != null && meter.MasterPeakValue > 0.001f)
+                    {
+                        Console.WriteLine($"[LiveAudioEngine] Detected active audio meter ({meter.MasterPeakValue:F3}) on device: {endpoint.FriendlyName}");
+                        return endpoint;
+                    }
+                }
+                catch {}
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[LiveAudioEngine] FindEchoRenderDevice error: {ex.Message}");
+        }
+        return null;
+    }
+
     public void StartLoopback(string? targetDeviceId = null)
     {
         lock (_gate)
         {
-            if (_loopbackRunning) return;
             try
             {
-                NAudio.CoreAudioApi.MMDevice? targetDevice = null;
                 var enumerator = new NAudio.CoreAudioApi.MMDeviceEnumerator();
+                NAudio.CoreAudioApi.MMDevice? targetDevice = null;
                 if (!string.IsNullOrEmpty(targetDeviceId))
                 {
                     try { targetDevice = enumerator.GetDevice(targetDeviceId); } catch {}
@@ -61,7 +119,28 @@ public class LiveAudioEngine : IDisposable
 
                 if (targetDevice == null)
                 {
-                    targetDevice = enumerator.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+                    targetDevice = FindEchoRenderDevice(enumerator);
+                }
+
+                if (targetDevice == null)
+                {
+                    try { targetDevice = enumerator.GetDefaultAudioEndpoint(NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia); } catch {}
+                }
+
+                if (targetDevice == null)
+                {
+                    Console.WriteLine("[LiveAudioEngine] No audio render device found for loopback.");
+                    return;
+                }
+
+                if (_loopbackRunning)
+                {
+                    if (_activeDeviceId == targetDevice.ID)
+                    {
+                        return;
+                    }
+                    Console.WriteLine($"[LiveAudioEngine] Switching loopback from {_activeDeviceId} to '{targetDevice.FriendlyName}' ({targetDevice.ID})...");
+                    StopLoopbackInternal();
                 }
 
                 _activeDeviceId = targetDevice.ID;
@@ -126,26 +205,25 @@ public class LiveAudioEngine : IDisposable
         }
     }
 
+    private void StopLoopbackInternal()
+    {
+        _reconnectTimer?.Dispose();
+        _reconnectTimer = null;
+
+        if (_loopbackCapture != null)
+        {
+            try { _loopbackCapture.StopRecording(); } catch {}
+            try { _loopbackCapture.Dispose(); } catch {}
+            _loopbackCapture = null;
+        }
+        _loopbackRunning = false;
+    }
+
     public void StopLoopback()
     {
         lock (_gate)
         {
-            _reconnectTimer?.Dispose();
-            _reconnectTimer = null;
-
-            if (!_loopbackRunning || _loopbackCapture == null) return;
-            try
-            {
-                _loopbackCapture.StopRecording();
-            }
-            catch {}
-            try
-            {
-                _loopbackCapture.Dispose();
-            }
-            catch {}
-            _loopbackCapture = null;
-            _loopbackRunning = false;
+            StopLoopbackInternal();
             Console.WriteLine("[LiveAudioEngine] Loopback capture stopped.");
         }
     }

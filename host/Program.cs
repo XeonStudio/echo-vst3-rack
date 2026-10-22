@@ -392,6 +392,77 @@ public class Program
                     }
                     break;
 
+                case "/api/slot/sync-state":
+                    if (doc != null && doc.RootElement.TryGetProperty("slot", out var ssSlotEl))
+                    {
+                        int slot = ssSlotEl.GetInt32();
+                        bool ok = s_rack.GetSlot(slot).SyncComponentStateToController();
+                        responseJson = JsonSerializer.Serialize(new { ok, state = s_rack.GetState() });
+                    }
+                    else
+                    {
+                        for (int s = 0; s < RackProcessor.MaxSlots; s++)
+                        {
+                            s_rack.GetSlot(s).SyncComponentStateToController();
+                        }
+                        responseJson = JsonSerializer.Serialize(new { ok = true, state = s_rack.GetState() });
+                    }
+                    break;
+
+                case "/api/slot/diag":
+                    int diagSlot = 1;
+                    if (doc != null && doc.RootElement.TryGetProperty("slot", out var diagSlotEl))
+                    {
+                        diagSlot = diagSlotEl.GetInt32();
+                    }
+                    var targetSlot = s_rack.GetSlot(diagSlot);
+                    var targetInst = targetSlot.Instance;
+                    responseJson = JsonSerializer.Serialize(new
+                    {
+                        ok = true,
+                        slot = diagSlot,
+                        hasPlugin = targetSlot.HasPlugin,
+                        name = targetSlot.PluginName ?? "",
+                        busDump = targetInst?.GetBusDump() ?? "(no instance)",
+                        inChannels = targetInst?.InChannels ?? 0,
+                        outChannels = targetInst?.OutChannels ?? 0,
+                        numInBusses = targetInst?.NumInputBusses ?? 0,
+                        numOutBusses = targetInst?.NumOutputBusses ?? 0,
+                        processingEnabled = targetInst?.ProcessingEnabled ?? false,
+                        connPointRes1 = targetInst?.ConnectionPointResult1 ?? 0,
+                        connPointRes2 = targetInst?.ConnectionPointResult2 ?? 0,
+                        lastProcessRes = targetInst?.LastProcessResult ?? 0,
+                        processCount = targetInst?.ProcessCount ?? 0,
+                        lastInPeak = targetInst?.LastInPeak ?? 0f,
+                        lastOutPeak = targetInst?.LastOutPeak ?? 0f,
+                        sampleRate = targetInst?.SampleRate ?? 0,
+                        rackSampleRate = s_rack.SampleRate
+                    });
+                    break;
+
+                case "/api/rack/transport/trigger":
+                    int pauseBlocks = 100;
+                    if (doc != null && doc.RootElement.TryGetProperty("pauseBlocks", out var pbEl))
+                    {
+                        pauseBlocks = pbEl.GetInt32();
+                    }
+                    s_rack.TriggerTransportRestart(pauseBlocks);
+                    responseJson = JsonSerializer.Serialize(new { ok = true, message = $"Transport restart triggered with {pauseBlocks} blocks pause" });
+                    break;
+
+                case "/api/rack/transport/set":
+                    if (doc != null && doc.RootElement.TryGetProperty("playing", out var plEl))
+                    {
+                        bool playing = plEl.GetBoolean();
+                        s_rack.SetTransportPlaying(playing);
+                        responseJson = JsonSerializer.Serialize(new { ok = true, playing });
+                    }
+                    else
+                    {
+                        responseJson = JsonSerializer.Serialize(new { ok = false, error = "缺少 playing 参数" });
+                    }
+                    break;
+
 
 
                 case "/api/rack/gain":

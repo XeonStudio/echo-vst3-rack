@@ -90,6 +90,11 @@ public class RackSlot : IDisposable
         }
     }
 
+    public bool SyncComponentStateToController()
+    {
+        return Instance?.SyncComponentStateToController() ?? false;
+    }
+
 
     public void Dispose()
     {

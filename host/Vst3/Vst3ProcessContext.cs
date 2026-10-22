@@ -40,9 +40,8 @@ public struct Vst3ProcessContext
     [FieldOffset(88)] public byte ChordKey;
     [FieldOffset(89)] public byte ChordRoot;
     [FieldOffset(90)] public short ChordMask;
-    [FieldOffset(92)] public ushort ChordType;
-    [FieldOffset(96)] public int SmpteOffsetSubframes;
-    [FieldOffset(100)] public uint FrameRateFramesPerSecond;
-    [FieldOffset(104)] public uint FrameRateFlags;
-    [FieldOffset(108)] public int SamplesToNextClock;
+    [FieldOffset(92)] public int SmpteOffsetSubframes;
+    [FieldOffset(96)] public uint FrameRateFramesPerSecond;
+    [FieldOffset(100)] public uint FrameRateFlags;
+    [FieldOffset(104)] public int SamplesToNextClock;
 }
